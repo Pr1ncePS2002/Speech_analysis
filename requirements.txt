@@ -1,0 +1,7 @@
+fastapi
+uvicorn
+psycopg2-binary      # PostgreSQL adapter
+sqlalchemy           # ORM for database models
+pydantic
+python-dotenv        # for managing environment variables
+openai-whisper       # Speech-to-text (Whisper)
