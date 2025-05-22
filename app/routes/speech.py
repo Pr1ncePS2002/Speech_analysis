@@ -1,18 +1,20 @@
-from fastapi import APIRouter, UploadFile, File, HTTPException
+from fastapi import APIRouter, UploadFile, File
+import shutil
+import os
 from app.services.whisper_service import transcribe_audio
-from app.utils.file_utils import save_temp_file, remove_file
 
 router = APIRouter()
 
-@router.post("/transcribe")
-async def transcribe_audio_route(file: UploadFile = File(...)):
-    if not file.content_type.startswith("audio/"):
-        raise HTTPException(status_code=400, detail="Only audio files are supported.")
+@router.post("/speech/upload")
+async def upload_audio(file: UploadFile = File(...)):
+    temp_file_path = f"temp_{file.filename}"
+    
+    with open(temp_file_path, "wb") as buffer:
+        shutil.copyfileobj(file.file, buffer)
 
-    temp_filename = await save_temp_file(file)
+    result = transcribe_audio(temp_file_path)
 
-    try:
-        result = transcribe_audio(temp_filename)
-        return {"text": result["text"]}
-    finally:
-        remove_file(temp_filename)
+    # Cleanup
+    os.remove(temp_file_path)
+
+    return result
