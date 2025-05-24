@@ -5,3 +5,13 @@ sqlalchemy           # ORM for database models
 pydantic
 python-dotenv        # for managing environment variables
 openai-whisper       # Speech-to-text (Whisper)
+
+#for llm
+streamlit
+google-generativeai
+pypdf
+langchain
+faiss-cpu
+langchain_google_genai
+langchain-community
+langchain-ollama
