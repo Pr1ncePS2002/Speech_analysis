@@ -5,16 +5,23 @@ from langchain.memory import ConversationBufferWindowMemory
 from langchain.chains import LLMChain
 from langchain_google_genai import ChatGoogleGenerativeAI
 import os
+import requests
 from dotenv import load_dotenv
+import time
 
 # Load environment variables
 load_dotenv()
 genai.configure(api_key=os.getenv("GOOGLE_API_KEY"))
 
-# Set up Streamlit page configuration
-st.set_page_config(page_title="Speech Assistant", layout="wide")
+# Constants
+API_ENDPOINT = "http://localhost:8000/api/speech/upload"
+ALLOWED_FILE_TYPES = ["wav", "mp3", "m4a"]
 
-# Initialize session state for chat history and chain
+# Initialize Streamlit
+st.set_page_config(page_title="Speech Assistant", layout="wide")
+st.title("🎙️ Speech Assistant")
+
+# Initialize session state
 if "messages" not in st.session_state:
     st.session_state.messages = [
         {"role": "Bot", "content": "Hi! I'm your Speech Assistant. How can I help you today?"}
@@ -22,41 +29,31 @@ if "messages" not in st.session_state:
 if "chatbot_chain" not in st.session_state:
     st.session_state.chatbot_chain = None
 
-# Function to initialize the chatbot
+# --- Chatbot Functions ---
 def initialize_chatbot():
     if st.session_state.chatbot_chain is None:
-        # Initialize LangChain compatible Google Generative AI
         llm = ChatGoogleGenerativeAI(model="gemini-2.0-flash-lite", temperature=0.7)
-        
-        # Create prompt template
+
         prompt = ChatPromptTemplate.from_template(
-            """
-            You are an expert communication coach and speech analyst. Analyze the following transcribed speech:
+            """You are an expert communication coach analyzing speech patterns:
             
-            **Conversation History:**
-            {chat_history}
+            History: {chat_history}
+            Current: {message}
 
-            **User's Current Message:**
-            {message}
-
-            Provide detailed analysis covering:
-            1. Grammatical Errors
-            2. Filler Words
-            3. Pauses and Flow
-            4. Vocabulary Usage
-            5. Fluency Score (0-10)
-            6. Improvement Suggestions
-            """
+            Provide analysis covering:
+            1. Grammar/Fillers
+            2. Pauses/Flow
+            3. Vocabulary
+            4. Fluency Score (1-10)
+            5. Improvement Suggestions"""
         )
 
-        # Configure memory with window for last 10 interactions
         memory = ConversationBufferWindowMemory(
             input_key="message",
             memory_key="chat_history",
             k=10
         )
 
-        # Create chain with memory
         st.session_state.chatbot_chain = LLMChain(
             llm=llm,
             prompt=prompt,
@@ -65,32 +62,65 @@ def initialize_chatbot():
         )
     return st.session_state.chatbot_chain
 
-# Function to interact with the chatbot
 def chat_with_bot(message):
-    chain = initialize_chatbot()
+    if isinstance(message, dict) and 'text' in message:
+        message = message['text']
+    
+    if not isinstance(message, str):
+        message = str(message)
+    
+    chain = initialize_chatbot()  # ✅ GET the chain here
     return chain.run(message=message)
 
-# Chat UI
-st.title("Speech Assistant")
 
-# Display chat history
+
+# --- Audio Processing ---
+def process_audio(uploaded_file):
+    try:
+        with st.spinner("🔊 Processing audio..."):
+            files = {"file": (uploaded_file.name, uploaded_file.getvalue())}
+            response = requests.post(API_ENDPOINT, files=files, timeout=30)
+            
+            if response.status_code == 200:
+                data = response.json()
+                return data["transcript"]
+            else:
+                st.error(f"❌ Backend error {response.status_code}: {response.text}")
+                return None
+    except Exception as e:
+        st.error(f"🚨 Connection error: {str(e)}")
+        return None
+
+# --- UI Components ---
+with st.sidebar:
+    st.header("Upload Audio")
+    uploaded_file = st.file_uploader(
+        "Drag file here",
+        type=ALLOWED_FILE_TYPES,
+        accept_multiple_files=False,
+        help="Max 200MB, WAV/MP3/M4A only"
+    )
+
+    if uploaded_file:
+        transcript = process_audio(uploaded_file)
+        if transcript:
+            st.session_state.messages.append({"role": "User", "content": transcript})
+            with st.spinner("🤖 Analyzing..."):
+                response = chat_with_bot(transcript)
+                st.session_state.messages.append({"role": "Bot", "content": response})
+
+# --- Chat Interface ---
 for message in st.session_state.messages:
     with st.chat_message(message["role"]):
-        st.markdown(f"**{message['role']}:** {message['content']}")
+        st.markdown(message["content"])
 
-# Text input handling
-input_text = st.chat_input("What do you need help with?")
-if input_text:
-    # Add user message to history
-    st.session_state.messages.append({"role": "User", "content": input_text})
-    
-    # Generate and display response
+if prompt := st.chat_input("Ask about your speech analysis..."):
+    st.session_state.messages.append({"role": "User", "content": prompt})
     with st.chat_message("User"):
-        st.markdown(f"**User:** {input_text}")
+        st.markdown(prompt)
     
     with st.chat_message("Bot"):
-        with st.spinner("Analyzing your speech..."):
-            response = chat_with_bot(input_text)
-            st.markdown(f"**Bot:** {response}")
-    
+        with st.spinner("Thinking..."):
+            response = chat_with_bot(prompt)
+            st.markdown(response)
     st.session_state.messages.append({"role": "Bot", "content": response})
