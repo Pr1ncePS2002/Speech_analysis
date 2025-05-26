@@ -2,6 +2,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from app.routes import speech
 import logging
+from app.routes import resume 
 
 # Configure logging
 logging.basicConfig(
@@ -22,7 +23,7 @@ app.add_middleware(
 
 # Include routes
 app.include_router(speech.router, prefix="/api/speech")
-
+app.include_router(resume.router, prefix="/api/resume")
 @app.get("/")
 async def root():
     return {"message": "Speech Analysis API is running"}
