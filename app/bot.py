@@ -77,10 +77,10 @@ def process_audio(uploaded_file):
 # --- Sidebar ---
 
 with st.sidebar:
-    st.header("📄 Resume First")
+    st.header("📄 Upload Resume")
 
     # Resume Upload
-    resume_file = st.file_uploader("Upload Resume", type=["pdf", "docx"])
+    resume_file = st.file_uploader("Upload Resume here", type=["pdf", "docx"])
     if resume_file:
         with st.spinner("📄 Parsing resume..."):
             try:
