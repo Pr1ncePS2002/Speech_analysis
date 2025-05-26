@@ -100,6 +100,15 @@ with st.sidebar:
         accept_multiple_files=False,
         help="Max 200MB, WAV/MP3/M4A only"
     )
+    st.header("Record Audio")
+    audio = st.audio_input("Record a voice message")
+    if audio:
+            transcript = process_audio(audio)
+            if transcript:
+                st.session_state.messages.append({"role": "User", "content": transcript})
+                with st.spinner("🤖 Analyzing..."):
+                    response = chat_with_bot(transcript)
+                    st.session_state.messages.append({"role": "Bot", "content": response})
 
     if uploaded_file:
         transcript = process_audio(uploaded_file)
@@ -108,6 +117,7 @@ with st.sidebar:
             with st.spinner("🤖 Analyzing..."):
                 response = chat_with_bot(transcript)
                 st.session_state.messages.append({"role": "Bot", "content": response})
+    
 
 # --- Chat Interface ---
 for message in st.session_state.messages:
