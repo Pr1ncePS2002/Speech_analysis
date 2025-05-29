@@ -1,3 +1,5 @@
+# speech_assistant_app.py
+
 import streamlit as st
 import google.generativeai as genai
 from langchain.prompts import ChatPromptTemplate
@@ -24,18 +26,21 @@ st.set_page_config(page_title="Speech Assistant", layout="wide")
 st.markdown("## 🎙️ Speech Analysis Assistant")
 st.markdown("Enhance your speaking skills, upload resumes, and prepare for interviews with AI.")
 
-# Session State
-if "messages" not in st.session_state:
-    st.session_state.messages = [
+# Session State Initialization
+if "speech_chain" not in st.session_state:
+    st.session_state.speech_chain = None
+if "interview_chain" not in st.session_state:
+    st.session_state.interview_chain = None
+if "speech_messages" not in st.session_state:
+    st.session_state.speech_messages = [
         {"role": "Bot", "content": "Hi! I'm your Speech Assistant. How can I help you today?"}
     ]
-if "chatbot_chain" not in st.session_state:
-    st.session_state.chatbot_chain = None
+if "interview_messages" not in st.session_state:
+    st.session_state.interview_messages = []
 
-
-# --- Chatbot Functions ---
-def initialize_chatbot():
-    if st.session_state.chatbot_chain is None:
+# --- Chatbot Initialization Functions ---
+def initialize_speech_chain():
+    if st.session_state.speech_chain is None:
         llm = ChatGoogleGenerativeAI(model="gemini-2.0-flash-lite", temperature=0.7)
         prompt = ChatPromptTemplate.from_template(
             """You are an expert communication coach analyzing speech patterns:
@@ -51,14 +56,34 @@ def initialize_chatbot():
             5. Improvement Suggestions"""
         )
         memory = ConversationBufferWindowMemory(input_key="message", memory_key="chat_history", k=10)
-        st.session_state.chatbot_chain = LLMChain(llm=llm, prompt=prompt, memory=memory, verbose=True)
-    return st.session_state.chatbot_chain
+        st.session_state.speech_chain = LLMChain(llm=llm, prompt=prompt, memory=memory, verbose=True)
+    return st.session_state.speech_chain
 
-def chat_with_bot(message):
-    if isinstance(message, dict) and 'text' in message:
-        message = message['text']
-    return initialize_chatbot().run(message=str(message))
+def initialize_interview_chain():
+    if st.session_state.interview_chain is None:
+        llm = ChatGoogleGenerativeAI(model="gemini-2.0-flash-lite", temperature=0.7)
+        prompt = ChatPromptTemplate.from_template(
+            """You are an AI Interviewer for a {role} position. The candidate has provided their resume and a list of key skills: {skills}.
+            Your task is to conduct a professional, adaptive, and challenging interview that mimics a real-world recruiter or hiring manager.
 
+            Instructions:
+            - Understand the candidate’s listed skills and how they relate to the {role} role.
+            - Ask one question at a time, increasing difficulty as the interview progresses.
+            - Use a mix of behavioral, technical, and situational questions.
+            - Tailor each question to the candidate’s resume and the job role.
+            - Wait for a response before continuing to the next question.
+            - After the user responds, analyze their answer and give brief constructive feedback before asking the next question."""
+        )
+        memory = ConversationBufferWindowMemory(input_key="message", memory_key="chat_history", k=10)
+        st.session_state.interview_chain = LLMChain(llm=llm, prompt=prompt, memory=memory, verbose=True)
+    return st.session_state.interview_chain
+
+# --- Chain Interaction Wrappers ---
+def chat_with_speech_bot(message):
+    return initialize_speech_chain().run(message=str(message))
+
+def chat_with_interview_bot(message, role, skills):
+    return initialize_interview_chain().run({"skills": skills, "role": role, "message": str(message)})
 
 # --- Audio Processing ---
 def process_audio(uploaded_file):
@@ -73,13 +98,9 @@ def process_audio(uploaded_file):
     except Exception as e:
         st.error(f"🚨 Connection error: {e}")
 
-
 # --- Sidebar ---
-
 with st.sidebar:
     st.header("📄 Upload Resume")
-
-    # Resume Upload
     resume_file = st.file_uploader("Upload Resume here", type=["pdf", "docx"])
     if resume_file:
         with st.spinner("📄 Parsing resume..."):
@@ -96,12 +117,9 @@ with st.sidebar:
             except Exception as e:
                 st.error(f"❌ Error: {e}")
 
-    # Audio Upload (Collapsed by default)
     with st.expander("🎙️ Audio Input", expanded=False):
         uploaded_file = st.file_uploader("Upload Audio", type=ALLOWED_FILE_TYPES)
-        audio = st.audio_input("Or Record Audio")
-
-
+        audio = st.file_uploader("Or Record Audio", type=ALLOWED_FILE_TYPES, label_visibility="collapsed")
 
 # --- Tabs ---
 tab1, tab2, tab3 = st.tabs(["💬 Chat Assistant", "🧠 Interview Questions", "🎭 Mock Interview"])
@@ -109,50 +127,61 @@ tab1, tab2, tab3 = st.tabs(["💬 Chat Assistant", "🧠 Interview Questions", "
 # --- Tab 1: Chat ---
 with tab1:
     st.subheader("💬 Chat-based Speech Feedback")
-
     if audio or uploaded_file:
         input_file = audio if audio else uploaded_file
         transcript = process_audio(input_file)
         if transcript:
-            st.session_state.messages.append({"role": "User", "content": transcript})
+            st.session_state.speech_messages.append({"role": "User", "content": transcript})
             with st.spinner("🤖 Analyzing..."):
-                response = chat_with_bot(transcript)
-                st.session_state.messages.append({"role": "Bot", "content": response})
+                response = chat_with_speech_bot(transcript)
+                st.session_state.speech_messages.append({"role": "Bot", "content": response})
 
-    for msg in st.session_state.messages:
+    for msg in st.session_state.speech_messages:
         with st.chat_message(msg["role"]):
             st.markdown(msg["content"])
 
     if prompt := st.chat_input("Ask about your speech or resume..."):
-        st.session_state.messages.append({"role": "User", "content": prompt})
+        st.session_state.speech_messages.append({"role": "User", "content": prompt})
         with st.chat_message("User"):
             st.markdown(prompt)
         with st.chat_message("Bot"):
             with st.spinner("Thinking..."):
-                response = chat_with_bot(prompt)
+                response = chat_with_speech_bot(prompt)
                 st.markdown(response)
-        st.session_state.messages.append({"role": "Bot", "content": response})
-
+        st.session_state.speech_messages.append({"role": "Bot", "content": response})
 
 # --- Tab 2: Interview Questions ---
 with tab2:
     st.subheader("🧠 Auto-Generated Interview Questions")
-
     skills = st.session_state.get("skills", [])
     role = st.session_state.get("role", "")
 
     if not skills or not role:
-        st.warning("⚠️ Please upload your resume first.")
+        st.warning("⚠️ Please upload your resume and select a role first.")
     else:
-        st.markdown(f"**Role**: {role}")
-        st.markdown("**Skills:** " + ", ".join(skills))
-        st.info("ℹ️ Question generation using Gemini coming soon!")
+        content = f"Skills: {', '.join(skills)} | Role: {role}"
+        if not st.session_state.interview_messages:
+            with st.spinner("🤖 Generating initial question..."):
+                response = chat_with_interview_bot(content, role, skills)
+                st.session_state.interview_messages.append({"role": "Bot", "content": response})
 
+        for msg in st.session_state.interview_messages:
+            with st.chat_message(msg["role"]):
+                st.markdown(msg["content"])
+
+        if prompt := st.chat_input("Type your answer here..."):
+            st.session_state.interview_messages.append({"role": "User", "content": prompt})
+            with st.chat_message("User"):
+                st.markdown(prompt)
+            with st.chat_message("Bot"):
+                with st.spinner("Thinking..."):
+                    response = chat_with_interview_bot(prompt, role, skills)
+                    st.markdown(response)
+            st.session_state.interview_messages.append({"role": "Bot", "content": response})
 
 # --- Tab 3: Mock Interview ---
 with tab3:
     st.subheader("🎭 Mock Interview Practice")
-
     skills = st.session_state.get("skills", [])
     role = st.session_state.get("role", "")
 
