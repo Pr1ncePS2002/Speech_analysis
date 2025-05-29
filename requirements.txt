@@ -15,3 +15,7 @@ faiss-cpu
 langchain_google_genai
 langchain-community
 langchain-ollama
+
+# for pdf parsing
+pdfplumber
+docx2txt
