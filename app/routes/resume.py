@@ -3,7 +3,7 @@ import logging
 import os
 from pathlib import Path
 from typing import Dict, Any
-from app.services.resume_parser import parse_resume
+from app.services.resume_parser import parse_resume, parse_entire_resume
 
 
 router = APIRouter()
@@ -19,6 +19,7 @@ async def upload_resume(file: UploadFile = File(...)):
             raise HTTPException(status_code=400, detail="Empty file")
             
         parsed_data = parse_resume(content, file.filename)
+        entire_data = parse_entire_resume(content, file.filename)
         
         if "error" in parsed_data:
             raise HTTPException(status_code=422, detail=parsed_data["error"])
@@ -26,7 +27,8 @@ async def upload_resume(file: UploadFile = File(...)):
         return {
             "status": "success",
             "filename": file.filename,
-            "parsed": parsed_data
+            "parsed": parsed_data,
+            "entire_data": entire_data
         }
         
     except HTTPException:
