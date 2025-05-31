@@ -68,18 +68,32 @@ def initialize_interview_qna_chain():
     if st.session_state.interview_qna_chain is None:
         llm = ChatGoogleGenerativeAI(model="gemini-2.0-flash-lite", temperature=0.7)
         prompt = ChatPromptTemplate.from_template(
-            """You are an AI mentor preparing a candidate for job interviews.
+"""You are an AI mentor preparing a candidate for job interviews.
 
-Based on the provided roles: {roles} and skills: {skills}, your task is to:
-- Ask one interview question at a time that is relevant to the roles and skills.
+Based on the provided roles: {roles} and skills: {skills}.
+
+**Your primary instruction is as follows:**
+
+IF the candidate's LAST message indicates they "don't know", are "not sure", "don't remember", or express similar uncertainty about the PREVIOUS question:
+- IMMEDIATELY provide a **'Sample Answer:'** or **'Explanation:'** for the *previous question*.
+- Follow this with constructive feedback: "Here's some feedback on that topic:"
+- THEN, ask a NEW, relevant interview question.
+
+OTHERWISE (if the candidate provides an answer):
+- Provide short, constructive feedback on their answer: what was good, what can be improved, and what was missing.
+- THEN, ask a NEW, relevant interview question.
+
+Constraints for all questions and feedback:
+- Ask only one interview question at a time.
 - Use a balanced mix of technical, behavioral, and situational questions.
 - Start with basic or moderate questions and gradually increase difficulty.
-- After each answer, give short, constructive feedback: what was good, what can be improved, and what was missing (if anything).
-- Do not simulate an interview or play a character. Just ask clear questions and provide helpful feedback.
+- Do not simulate an interview or play a character beyond being an AI mentor.
 
-Keep it concise, relevant, and focused only on skill and role-based preparation.
+History: {chat_history}
+Current: {message}
 """
-        )
+)
+
         memory = ConversationBufferWindowMemory(input_key="message", memory_key="chat_history", k=10)
         st.session_state.interview_qna_chain = LLMChain(llm=llm, prompt=prompt, memory=memory, verbose=True)
     return st.session_state.interview_qna_chain
@@ -247,7 +261,7 @@ with tab2:
         if not st.session_state.interview_qna_messages:
             with st.spinner("🤖 Generating initial question..."):
                 response = chat_with_interview_bot("", role, skills)
-                st.session_state.interview_qna_messages.append({"role": "Bot", "content": response})
+            st.session_state.interview_qna_messages.append({"role": "Bot", "content": response})
 
         for msg in st.session_state.interview_qna_messages:
             with st.chat_message(msg["role"]):
@@ -274,7 +288,7 @@ with tab3:
         if not st.session_state.interviewer_messages:
             with st.spinner("🤖 Generating initial question..."):
                 response = chat_with_interviewer("", entire_data)
-                st.session_state.interviewer_messages.append({"role": "Bot", "content": response})
+            st.session_state.interviewer_messages.append({"role": "Bot", "content": response})
 
         for msg in st.session_state.interviewer_messages:
             with st.chat_message(msg["role"]):
