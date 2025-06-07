@@ -5,8 +5,6 @@ from app.database.models import User, ChatHistory
 from app.auth.auth_utils import hash_password # Ensure this import is correct
 
 # Dependency to get a database session (can also be defined here or in db.py)
-# For consistency, I'll define it here if it's not strictly in db.py for some reason.
-# If you prefer it only in db.py or main.py, remove this `get_db` definition.
 from app.database.db import SessionLocal
 
 def get_db():

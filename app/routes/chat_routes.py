@@ -10,7 +10,6 @@ from app.database.models import User, ChatHistory # Import models for type hinti
 router = APIRouter()
 
 # Dependency to get a database session
-# This is usually defined in db.py or main.py; importing from crud is also fine if defined there.
 from app.database.db import SessionLocal
 
 def get_db():

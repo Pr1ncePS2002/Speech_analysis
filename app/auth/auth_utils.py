@@ -13,7 +13,6 @@ from app.database.models import User
 from app.database.db import SessionLocal, engine 
 
 # --- Dependency to get a database session ---
-# This is often also defined in db.py or main.py, but for self-containment here.
 def get_db():
     db = SessionLocal()
     try:
@@ -28,7 +27,7 @@ ACCESS_TOKEN_EXPIRE_MINUTES = 60
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 
 # This is the OAuth2 scheme that expects a Bearer token in the Authorization header
-oauth2_scheme = OAuth2PasswordBearer(tokenUrl="api/auth/login") # Corrected tokenUrl to match your main.py setup
+oauth2_scheme = OAuth2PasswordBearer(tokenUrl="api/auth/login")  #tokenUrl to match  main.py setup
 
 def hash_password(password: str):
     """Hashes a plain text password using bcrypt."""
@@ -48,7 +47,7 @@ def create_access_token(data: dict, expires_delta: Optional[timedelta] = None):
     if expires_delta:
         expire = datetime.utcnow() + expires_delta
     else:
-        # Default expiry if not provided
+        # Default expiry 
         expire = datetime.utcnow() + timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
     to_encode.update({"exp": expire})
     return jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)

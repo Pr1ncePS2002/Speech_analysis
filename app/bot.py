@@ -1,7 +1,6 @@
 import sys
 from pathlib import Path
 # Add project root to Python path
-# Ensure this path is correct for your project structure
 sys.path.append(str(Path(__file__).parent.parent))
 
 import streamlit as st
@@ -10,21 +9,21 @@ from langchain.prompts import ChatPromptTemplate
 from langchain.memory import ConversationBufferWindowMemory
 from langchain.chains import LLMChain
 from langchain_google_genai import ChatGoogleGenerativeAI
-from langchain.chains.conversational_retrieval.base import ConversationalRetrievalChain # Already imported
-from langchain_core.documents import Document # Already imported
+from langchain.chains.conversational_retrieval.base import ConversationalRetrievalChain 
+from langchain_core.documents import Document 
 import os
 import requests
 from dotenv import load_dotenv
 import traceback
 import logging
 from typing import List, Dict, Any # Import Dict and Any for broader type hinting
-import json # <<< ADDED: Import the json module
+import json # Import the json module
 
-# NEW IMPORTS FOR RAG (Assuming these paths are correct)
-from utils.rag_utils import load_and_embed_docs # Your internal docs RAG utility
-from services.rag_service import build_vector_store # Your resume RAG utility
+# NEW IMPORTS FOR RAG 
+from utils.rag_utils import load_and_embed_docs #internal docs RAG utility
+from services.rag_service import build_vector_store # resume RAG utility
 
-# Add this line to allow duplicate OpenMP libraries
+#  allow duplicate OpenMP libraries
 os.environ["KMP_DUPLICATE_LIB_OK"] = "TRUE"
 
 # Configure logging
@@ -36,7 +35,6 @@ load_dotenv()
 genai.configure(api_key=os.getenv("GOOGLE_API_KEY"))
 
 # --- Configuration ---
-# IMPORTANT: Replace with the actual URL of your deployed FastAPI backend
 # For local testing, it's usually http://127.0.0.1:8000
 FASTAPI_BASE_URL = "http://127.0.0.1:8000"
 API_ENDPOINT = f"{FASTAPI_BASE_URL}/api/speech/upload"
