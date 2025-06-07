@@ -14,7 +14,7 @@ logger = logging.getLogger(__name__)
 load_dotenv()
 
 # Define the path where you want to save/load your FAISS index
-FAISS_INDEX_PATH = "app/faiss_index" # Choose a good path
+FAISS_INDEX_PATH = "app/faiss_index" 
 
 def clean_text_for_embedding(text: str) -> str:
     normalized_text = unicodedata.normalize('NFKC', text)
