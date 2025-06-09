@@ -19,3 +19,6 @@ langchain-ollama
 # for pdf parsing
 pdfplumber
 docx2txt
+sqlmodel 
+passlib[bcrypt] 
+python-jose[cryptography]
