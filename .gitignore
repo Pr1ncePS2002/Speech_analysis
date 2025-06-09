@@ -1,6 +1,3 @@
 venv
-echo "*.pyc" >> .gitignore
-echo "__pycache__/" >> .gitignore
-app/__pycache__/
-app/routes/__pycache__/
-app/services/__pycache__/
+__pycache__/
+*.pyc
