@@ -12,6 +12,8 @@ from typing import List, Dict, Any # Import Dict and Any for broader type hintin
 from dotenv import load_dotenv
 from utils.rag_utils import load_and_embed_docs #internal docs RAG utility
 from services.rag_service import build_vector_store # resume RAG utility
+from langchain.schema import Document
+
 
 FASTAPI_BASE_URL = "http://127.0.0.1:8000"
 API_ENDPOINT = f"{FASTAPI_BASE_URL}/api/speech/upload"

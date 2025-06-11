@@ -14,6 +14,8 @@ import json # Import the json module
 from services.whisper_service import transcribe_audio
 from utils.bot_utils import chat_with_speech_bot, chat_with_interview_bot, chat_with_interviewer
 import time
+from services.resume_parser import parse_resume, parse_entire_resume
+
 
 #  allow duplicate OpenMP libraries
 os.environ["KMP_DUPLICATE_LIB_OK"] = "TRUE"
@@ -253,7 +255,7 @@ def show_login_signup_form():
 
 def show_authenticated_content():
     """Contains all the main application features accessible after login."""
-    
+
     # Sidebar
     with st.sidebar:
         st.header(f"Hello, {st.session_state.username}!")
@@ -261,19 +263,40 @@ def show_authenticated_content():
 
         st.header("📄 Upload Resume")
         resume_file = st.file_uploader("Upload Resume here", type=["pdf", "docx"])
-        if resume_file:
-            parsed_data = process_resume(resume_file)
-            if parsed_data:
-                st.session_state.skills = parsed_data.get("parsed", {}).get("skills", [])
-                roles = parsed_data.get("parsed", {}).get("roles", [])
+
+        if resume_file and "resume_parsed" not in st.session_state:
+            file_content = resume_file.read()
+
+            # Run both parsers and store in session_state
+            parsed = parse_resume(file_content, resume_file.name)
+            entire = parse_entire_resume(file_content, resume_file.name)
+
+            if parsed.get("success") and entire.get("success"):
+                # Cache both
+                st.session_state.resume_parsed = parsed
+                st.session_state.resume_entire = entire
+
+                # Store specific fields for easy access
+                st.session_state.skills = parsed.get("skills", [])
+                roles = parsed.get("roles", [])
                 st.session_state.role = roles[0] if roles else ""
-                st.session_state.entiredata = parsed_data.get("entire_data", {})
+                st.session_state.entiredata = entire
+
                 st.success("✅ Resume parsed!")
             else:
                 st.error("❌ Resume parsing failed.")
 
+        # Optional: Display resume data if available
+        # if "resume_parsed" in st.session_state:
+        #     with st.expander("🧠 Resume Summary"):
+        #         st.write("**Skills:**", st.session_state.skills)
+        #         st.write("**Role:**", st.session_state.role)
+        #         st.write("**Email:**", st.session_state.entiredata.get("metadata", {}).get("email"))
+        #         st.write("**Phone:**", st.session_state.entiredata.get("metadata", {}).get("phone"))
+
         with st.expander("🎙️ Audio Input", expanded=False):
             uploaded_file = st.file_uploader("Upload Audio", type=ALLOWED_FILE_TYPES)
+
 
 
     # Main Content Tabs
