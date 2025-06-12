@@ -15,6 +15,7 @@ faiss-cpu
 langchain_google_genai
 langchain-community
 langchain-ollama
+sentence-transformers nltk #NEW
 
 # for pdf parsing
 pdfplumber

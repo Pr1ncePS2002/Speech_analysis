@@ -5,13 +5,17 @@ from typing import List, Dict
 from langchain_google_genai import GoogleGenerativeAIEmbeddings, ChatGoogleGenerativeAI
 from langchain_community.vectorstores import FAISS
 from langchain_community.document_loaders import PyPDFLoader
-from langchain.text_splitter import RecursiveCharacterTextSplitter
 from langchain.chains import RetrievalQA
 from langchain.docstore.document import Document
 from tempfile import NamedTemporaryFile
 import unicodedata
-from .resume_parser import parse_entire_resume  # Import the function
 import logging
+from .resume_parser import parse_entire_resume  # Import the function
+
+# 🔹 NEW: Sentence tokenizer
+from nltk.tokenize import sent_tokenize
+import nltk
+nltk.download('punkt')
 
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 logger = logging.getLogger(__name__)
@@ -59,11 +63,22 @@ def load_uploaded_resume(uploaded_file_bytes: bytes) -> List[Document]:
     return docs
 
 
+# 🔹 NEW: Semantic chunking function (replaces SemanticChunker)
+def semantic_chunk(documents: List[Document], chunk_size: int = 3) -> List[Document]:
+    chunks = []
+    for doc in documents:
+        sentences = sent_tokenize(doc.page_content)
+        for i in range(0, len(sentences), chunk_size):
+            chunk_text = " ".join(sentences[i:i + chunk_size])
+            chunks.append(Document(page_content=chunk_text, metadata=doc.metadata))
+    return chunks
+
+
 def build_vector_store(documents: List[Document], desc: str = "documents") -> FAISS:
-    splitter = RecursiveCharacterTextSplitter(chunk_size=1000, chunk_overlap=200)
-    chunks = splitter.split_documents(documents)
-    logger.info(f"Creating vector store for {desc} with {len(chunks)} chunks.")
     embeddings = GoogleGenerativeAIEmbeddings(model="models/embedding-001", google_api_key=GOOGLE_API_KEY)
+    logger.info(f"Chunking documents for {desc}")
+    chunks = semantic_chunk(documents, chunk_size=3)  # 🔹 Using custom chunking
+    logger.info(f"Creating vector store for {desc} with {len(chunks)} chunks.")
     return FAISS.from_documents(chunks, embedding=embeddings)
 
 
@@ -97,12 +112,12 @@ def generate_interview_with_resume(uploaded_resume_bytes: bytes, filename: str, 
             contextual_queries.append(f"{query} related to {', '.join(skills)}")
         if roles:
             contextual_queries.append(f"{query} for a {', '.join(roles)}")
-        contextual_queries.append(f"{query} given the following resume context: {full_resume_text}")  # Add full resume text context
+        contextual_queries.append(f"{query} given the following resume context: {full_resume_text}")
 
         # 5. Query internal docs with contextual queries
         internal_context_docs = []
         for q in contextual_queries:
-            internal_context_docs.extend(internal_vector_store.similarity_search(q, k=2))  # Reduce k to avoid too much context
+            internal_context_docs.extend(internal_vector_store.similarity_search(q, k=2))
         internal_context_text = "\n".join([doc.page_content for doc in internal_context_docs])
 
         # 6. Combine and prioritize context
@@ -114,13 +129,12 @@ def generate_interview_with_resume(uploaded_resume_bytes: bytes, filename: str, 
         qa_chain = RetrievalQA.from_chain_type(
             llm=llm,
             chain_type="stuff",
-            retriever=internal_vector_store.as_retriever(search_type="similarity", search_kwargs={"k": 5}),  # Use internal_vector_store here
-            #  return_source_documents=True # For debugging
+            retriever=internal_vector_store.as_retriever(search_type="similarity", search_kwargs={"k": 5}),
         )
 
-        #  result = qa_chain({"query": query, "context": combined_context}) # If you modify the prompt
-        result = qa_chain({"query": f"{query}\nContext:{combined_context}"})  # Modified query to include context
-        return result["result"] # + f"\n\nSource Documents:\n{result.get('source_documents')}" # For debugging
+        result = qa_chain({"query": f"{query}\nContext:{combined_context}"})
+        return result["result"]
+
     except Exception as e:
         logger.error(f"Error in generate_interview_with_resume: {e}", exc_info=True)
         return f"An error occurred: {e}"

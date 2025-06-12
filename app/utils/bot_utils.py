@@ -373,3 +373,14 @@ def chat_with_interviewer(message: str, entire_data: Dict[str, Any]) -> str:
             access_token=st.session_state.access_token
         )
     return response
+
+# def run_chain_with_save(chain, inputs: Dict[str, Any], message: str) -> str:
+#     response = chain.run(inputs)
+#     if st.session_state.logged_in:
+#         save_new_chat_entry(
+#             user_id=st.session_state.user_id,
+#             question=message,
+#             answer=response,
+#             access_token=st.session_state.access_token
+#         )
+#     return response
