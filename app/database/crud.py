@@ -26,11 +26,11 @@ def create_user(db: Session, username: str, email: str, password: str):
     db.refresh(db_user)
     return db_user
 
-def save_chat(db: Session, user_id: int, question: str, answer: str, chat_type: str = None): # <<< Added chat_type
+def save_chat(db: Session, user_id: int, question: str, answer: str): # <<< Added chat_type
     """Saves a chat history entry for a specific user."""
     # Ensure ChatHistory model has 'chat_type' if you want to save it
     # If not, remove chat_type from here or add it to ChatHistory model.
-    chat = ChatHistory(user_id=user_id, question=question, answer=answer, chat_type=chat_type)
+    chat = ChatHistory(user_id=user_id, question=question, answer=answer)
     db.add(chat)
     db.commit()
     db.refresh(chat)
