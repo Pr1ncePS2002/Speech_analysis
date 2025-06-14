@@ -30,3 +30,7 @@ python-jose[cryptography]
 unstructured[all-docs]
 pdfminer.six==20221105
 pypdfium2
+
+# refreshtokenstuff
+alembic
+# initialize it by using ("alembic init alembic")
