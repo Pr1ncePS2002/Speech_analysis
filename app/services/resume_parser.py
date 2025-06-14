@@ -9,6 +9,11 @@ import logging
 from pathlib import Path
 import unicodedata # Added import for clean_text_for_embedding
 
+#unstructured lib import
+from unstructured.partition.image import partition_image
+from unstructured.partition.pdf import partition_pdf
+import tempfile
+
 # Set up basic logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -151,10 +156,20 @@ def extract_text_from_resume(content: bytes, filename: str) -> Optional[str]:
         file_ext = Path(filename).suffix.lower()
 
         if file_ext == ".pdf":
-            with pdfplumber.open(io.BytesIO(content)) as pdf:
-                text = "\n".join(
-                    page.extract_text() or "" for page in pdf.pages
-                )
+                with tempfile.NamedTemporaryFile(delete=False, suffix=".pdf") as tmp:
+                    tmp.write(content)
+                    tmp_path = tmp.name
+
+                elements = partition_pdf(filename=tmp_path, languages=["eng"])
+
+                text = ""
+                for element in elements:
+                    text += element.text + "\n"
+            
+            # with pdfplumber.open(io.BytesIO(content)) as pdf:
+            #     text = "\n".join(
+            #         page.extract_text() or "" for page in pdf.pages
+            #     )
                 if not text.strip():
                     logger.warning("PDF text extraction failed, trying alternative method")
                     text = "\n".join(
@@ -168,6 +183,13 @@ def extract_text_from_resume(content: bytes, filename: str) -> Optional[str]:
 
         elif file_ext in (".txt", ".rtf"):
             return content.decode('utf-8', errors='ignore')
+        
+        elif file_ext in(".jpg", "jpeg"):
+            elements = partition_image(filename)
+            text = ""
+            for element in elements:
+                text += element.text
+            return text
 
         else:
             raise ValueError(f"Unsupported file format: {file_ext}")
@@ -235,3 +257,4 @@ def parse_entire_resume(content: bytes, filename: str) -> Dict[str, Union[str, d
     except Exception as e:
         logger.error(f"Full resume parsing failed: {str(e)}")
         return {"error": f"Full parsing failed: {str(e)}", "success": False}
+    

@@ -61,7 +61,47 @@ def load_uploaded_resume(uploaded_file_bytes: bytes) -> List[Document]:
         doc.page_content = clean_text_for_embedding(doc.page_content)
 
     return docs
+#custom splitter for resume
+def custom_resume_splitter(text: str) -> Dict[str, str]:
+    """
+    Splits resume text into chunks based on given keywords (section headers).
+    
+    Args:
+        text (str): The entire resume text.
+        keywords (List[str]): Section headers to split on (case-insensitive).
+    
+    Returns:
+        Dict[str, str]: A dictionary with section names as keys and their content as values.
+    """
+    keywords = ["SUMMARY", "EDUCATION", "PROJECTS", "RELEVANT SKILLS", "SKILLS", "CERTIFICATIONS", "ADDITIONAL INFORMATION"]
+    
+    # Normalize text
+    text = text.replace('\n', '\n\n')  # Separate lines visually for regex reliability
 
+    # Create regex pattern for section titles
+    pattern = r'(?i)^(' + '|'.join(re.escape(k) for k in keywords) + r')\s*$'
+    
+    # Find all matches
+    matches = list(re.finditer(pattern, text, flags=re.MULTILINE))
+
+    #Extracting name
+    name = ''
+    for i in range(50):
+        if text[i] == "\n":
+            break
+        name += text[i]
+    
+    # Extract sections
+    chunks = {}
+    chunks['Name'] = name
+    
+    for i, match in enumerate(matches):
+        start = match.end()
+        end = matches[i + 1].start() if i + 1 < len(matches) else len(text)
+        section = match.group(1).strip().title()
+        chunks[section] = text[start:end].strip()
+    
+    return chunks
 
 # 🔹 NEW: Semantic chunking function (replaces SemanticChunker)
 def semantic_chunk(documents: List[Document], chunk_size: int = 3) -> List[Document]:
@@ -81,6 +121,12 @@ def build_vector_store(documents: List[Document], desc: str = "documents") -> FA
     logger.info(f"Creating vector store for {desc} with {len(chunks)} chunks.")
     return FAISS.from_documents(chunks, embedding=embeddings)
 
+def build_vector_store_resume(documents: List[Document], desc: str = "documents") -> FAISS:
+    embeddings = GoogleGenerativeAIEmbeddings(model="models/embedding-001", google_api_key=GOOGLE_API_KEY)
+    logger.info(f"Chunking documents for {desc}")
+    chunks = custom_resume_splitter(documents)  # 🔹 Using custom chunking
+    logger.info(f"Creating vector store for {desc} with {len(chunks)} chunks.")
+    return FAISS.from_documents(chunks, embedding=embeddings)
 
 def generate_interview_with_resume(uploaded_resume_bytes: bytes, filename: str, query: str) -> str:
     try:
@@ -98,7 +144,7 @@ def generate_interview_with_resume(uploaded_resume_bytes: bytes, filename: str, 
         full_resume_text = resume_data.get("full_text", "")
 
         # 2. Build separate vector stores
-        resume_vector_store = build_vector_store(resume_docs, "resume")
+        resume_vector_store = build_vector_store_resume(resume_docs, "resume")
         internal_vector_store = build_vector_store(internal_docs, "internal docs")
 
         # 3. Initial query of resume

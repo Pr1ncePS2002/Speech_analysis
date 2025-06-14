@@ -470,7 +470,7 @@ def show_authenticated_content():
                     # Bot response
                     with st.chat_message("Bot"):
                         with st.spinner("Thinking..."):
-                            response = chat_with_interviewer(user_input, role, skills)
+                            response = chat_with_interviewer(user_input, entire_data)
                             st.markdown(response)
 
                     st.session_state.interviewer_messages.append({"role": "Bot", "content": response})
