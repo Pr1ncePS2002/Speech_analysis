@@ -16,7 +16,8 @@ langchain_google_genai
 langchain-community
 langchain-ollama
 
-sentence-transformers nltk #NEW
+sentence-transformers
+nltk #NEW
 
 # for pdf parsing
 pdfplumber
@@ -24,3 +25,8 @@ docx2txt
 sqlmodel 
 passlib[bcrypt] 
 python-jose[cryptography]
+
+#unstructured
+unstructured[all-docs]
+pdfminer.six==20221105
+pypdfium2
