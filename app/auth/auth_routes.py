@@ -9,6 +9,10 @@ from app.schemas import UserCreate
 from typing import Annotated 
 from datetime import datetime, timezone # For blacklisting expiry
 
+from fastapi import Depends
+from app.auth.auth_utils import get_current_user
+from app.database.models import User
+
 router = APIRouter()
 
 def get_db():
@@ -137,3 +141,10 @@ def clean_blacklist_endpoint(db: Session = Depends(get_db)):
     """
     crud.remove_expired_blacklisted_tokens(db)
     return {"message": "Expired blacklisted tokens cleaned up."}
+
+@router.get("/me")
+def read_current_user(current_user: User = Depends(get_current_user)):
+    return {
+        "username": current_user.username,
+        "email": current_user.email
+    }
