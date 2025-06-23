@@ -13,6 +13,7 @@ from dotenv import load_dotenv
 from utils.rag_utils import load_and_embed_docs #internal docs RAG utility
 from services.rag_service import build_vector_store # resume RAG utility
 from langchain.schema import Document
+import re
 
 
 FASTAPI_BASE_URL = "http://127.0.0.1:8000"
@@ -33,7 +34,7 @@ load_dotenv()
 genai.configure(api_key=os.getenv("GOOGLE_API_KEY"))
 
 # You will need your GOOGLE_API_KEY here for embeddings for the temp resume vector store
-GOOGLE_API_KEY = os.getenv("GOOGLE_API_KEY") # Ensure this is accessible
+GOOGLE_API_KEY = os.getenv("GOOGLE_API_KEY") 
 
 def get_mock_interview_context(
     user_query: str,
@@ -251,7 +252,13 @@ def initialize_interviewer_chain():
             llm = ChatGoogleGenerativeAI(model="gemini-2.0-flash-lite", temperature=0.7)
             logger.info("LLM for interviewer_chain initialized.")
 
-            prompt_template_str = """You are an experienced, professional, and analytical hiring bot designed to conduct structured interviews for job candidates. Your task is to ask relevant, insightful, and role-specific questions based on the candidate’s resume and the provided context.
+            prompt_template_str = """
+You are an experienced, professional, and analytical hiring bot designed to conduct structured interviews for job candidates.
+
+Your tasks:
+1. Ask relevant, insightful, and role-specific questions based on the candidate’s resume and internal documents.
+2. If the candidate expresses uncertainty or says things like "I don't know", use the context to explain or give a sample answer to the previous question.
+3. Provide brief feedback and follow up with a new related question.
 
 ---
 **Combined Context:**
@@ -259,23 +266,23 @@ def initialize_interviewer_chain():
 
 ---
 Instructions:
-- **Prioritize information from the "Combined Context" section** when formulating questions and providing feedback.
+- Prioritize information from the "Combined Context" section.
 - Ask only one question at a time.
 - Use a balanced mix of technical, behavioral, and situational questions.
-- Tailor questions specifically based on the candidate's background and the job role/skills extracted from their resume.
-- Start with basic or moderate questions and gradually increase difficulty.
-- Your first response should be a brief introduction, then ask the first question.
-- Do not simulate an interview or play a character beyond being an AI mentor.
-
-**Example Questions:**
-- "Your resume mentions experience in [Specific Skill/Technology]. Can you elaborate on a project where you heavily utilized this?"
-- "Based on your experience at [Company Name], can you describe a time you faced a significant technical challenge and how you overcame it?"
-- "Given your [Role] experience, how would you approach [Hypothetical Scenario relevant to the role]?"
+- Tailor questions specifically to the candidate's background and job role.
+- If user says "no idea", "I don’t know", or anything similar:
+  • Use the context to generate an example or explanation related to the topic.
+  • Provide a brief, encouraging explanation or feedback.
+  • Then ask a new question related to the topic.
+- Start with easy to medium questions and progress toward more advanced ones.
+- Keep a helpful, concise, and professional tone.
+- Do not simulate a personality or character.
 
 ---
 Chat History: {chat_history}
 User Input: {question}
 """
+
             prompt = ChatPromptTemplate.from_template(prompt_template_str)
             logger.info("Prompt template for interviewer_chain created.")
 
@@ -293,11 +300,14 @@ User Input: {question}
                 verbose=True
             )
             logger.info("interviewer_chain (LLMChain) initialized successfully.")
+
         except Exception as e:
             logger.error(f"Error initializing interviewer_chain: {e}", exc_info=True)
             st.error(f"Failed to initialize Mock Interview Chain. Error: {e}")
             st.session_state.interviewer_chain = None
+
     return st.session_state.interviewer_chain
+
 
 # --- Chain Interaction Wrappers (Modified to save to backend) ---
 def chat_with_speech_bot(message: str) -> str:
@@ -314,6 +324,10 @@ def chat_with_speech_bot(message: str) -> str:
 def chat_with_interview_bot(message: str, roles: List[str], skills: List[str]) -> str:
     chain = initialize_interview_qna_chain()
 
+    # Check for weak/unknown answers
+    uncertainty_phrases = ["i don't know", "idk", "no idea","i dont know","no","pass", "not sure", "don’t remember"]
+    is_uncertain = message.strip().lower() in uncertainty_phrases
+
     context_prefix = ""
     if roles and isinstance(roles, list) and roles[0]:
         context_prefix += f"Based on the provided role: {roles[0]}."
@@ -328,12 +342,18 @@ def chat_with_interview_bot(message: str, roles: List[str], skills: List[str]) -
     else:
         logger.info(f"Generating questions based on: {context_prefix}")
 
-    full_question_for_llm = f"{context_prefix}\n\nUser input: {message}" if message else context_prefix
+    # Prepare question for LLM (force useful input even when user said "no idea")
+    full_question_for_llm = (
+        f"{context_prefix}\n\nUser input: {message}" if not is_uncertain
+        else f"{context_prefix}\n\nUser input: The candidate responded with uncertainty or said they don't know."
+    )
 
+    # Run the chain
     response = chain.run({
         "question": full_question_for_llm,
         "chat_history": st.session_state.interview_qna_messages,
     })
+
     if st.session_state.logged_in:
         save_new_chat_entry(
             user_id=st.session_state.user_id,
@@ -341,17 +361,29 @@ def chat_with_interview_bot(message: str, roles: List[str], skills: List[str]) -
             answer=response,
             access_token=st.session_state.access_token
         )
+
     return response
+
+
+def is_uncertain_response(text: str) -> bool:
+    """
+    Check if the user's input is an uncertain response like "I don't know", "no idea", etc.
+    """
+    text = text.strip().lower()
+    patterns = [
+        r"i\s+don'?t\s+know",
+        r"\b(idk|no idea|not sure|don’t remember)\b"
+    ]
+    return any(re.search(p, text) for p in patterns)
 
 def chat_with_interviewer(message: str, entire_data: Dict[str, Any]) -> str:
     chain = initialize_interviewer_chain()
-    
+    is_uncertain = is_uncertain_response(message)
+
     full_resume_text = entire_data.get("full_text", format_resume_data_for_llm(entire_data))
-    
     extracted_data = entire_data.get("extracted_data", {})
     skills = extracted_data.get("skills", entire_data.get("skills", []))
-    roles = extracted_data.get("roles", entire_data.get("roles", []))
-    roles = [r for r in roles if r]
+    roles = [r for r in extracted_data.get("roles", entire_data.get("roles", [])) if r]
 
     combined_context = get_mock_interview_context(
         user_query=message,
@@ -359,12 +391,20 @@ def chat_with_interviewer(message: str, entire_data: Dict[str, Any]) -> str:
         skills=skills,
         roles=roles
     )
-    
+
+    user_input_to_model = (
+        "The candidate responded with uncertainty or said they don't know." if is_uncertain
+        else message
+    )
+
+    chat_history = st.session_state.get("interviewer_messages", [])
+
     response = chain.run({
-        "question": message,
+        "question": user_input_to_model,
         "context": combined_context,
-        "chat_history": st.session_state.interviewer_messages
+        "chat_history": chat_history
     })
+
     if st.session_state.logged_in:
         save_new_chat_entry(
             user_id=st.session_state.user_id,
@@ -372,15 +412,5 @@ def chat_with_interviewer(message: str, entire_data: Dict[str, Any]) -> str:
             answer=response,
             access_token=st.session_state.access_token
         )
-    return response
 
-# def run_chain_with_save(chain, inputs: Dict[str, Any], message: str) -> str:
-#     response = chain.run(inputs)
-#     if st.session_state.logged_in:
-#         save_new_chat_entry(
-#             user_id=st.session_state.user_id,
-#             question=message,
-#             answer=response,
-#             access_token=st.session_state.access_token
-#         )
-#     return response
+    return response

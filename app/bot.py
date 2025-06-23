@@ -419,80 +419,86 @@ def show_authenticated_content():
         st.subheader("🎭 Mock Interview Practice")
         entire_data = st.session_state.get("entiredata", {})
 
+        # Step 1: Ensure messages list is initialized
+        if "interviewer_messages" not in st.session_state:
+            st.session_state.interviewer_messages = []
+
+        # Step 2: Require resume
         if not entire_data:
             st.warning("⚠️ Please upload your resume first.")
-        else:
-            if not st.session_state.interviewer_messages:
-                with st.spinner("🤖 Generating initial question..."):
-                    response = chat_with_interviewer("", entire_data) # This now includes saving
-                st.session_state.interviewer_messages.append({"role": "Bot", "content": response})
+            st.stop()
 
-            for msg in st.session_state.interviewer_messages:
-                with st.chat_message(msg["role"]):
-                    st.markdown(msg["content"])
-            
-            # Speech-to-text button
-            audio_value = st.audio_input("🎤 Record a voice message (max 30 seconds)", key="audio_input_2")
+        # Step 3: Generate initial interviewer question
+        if not st.session_state.interviewer_messages:
+            with st.spinner("🤖 Generating initial question..."):
+                response = chat_with_interviewer("", entire_data)
+            st.session_state.interviewer_messages.append({"role": "Bot", "content": response})
 
-            if audio_value:
-                st.audio(audio_value)
+        # Step 4: Render chat history
+        for msg in st.session_state.interviewer_messages:
+            with st.chat_message(msg["role"]):
+                st.markdown(msg["content"])
 
-                # Unique filename
-                timestamp = int(time.time())
-                audio_path = Path(f"audio_{timestamp}.wav")
+        # Step 5: Handle audio input
+        audio_value = st.audio_input("🎤 Record a voice message (max 30 seconds)", key="audio_input_2")
+        if audio_value:
+            st.audio(audio_value)
+            import time
+            from pathlib import Path
 
-                try:
-                    # Save uploaded audio
-                    audio_bytes = audio_value.read()
-                    if len(audio_bytes) == 0:
-                        st.warning("Empty audio recording — please try again.")
-                        st.stop()
+            timestamp = int(time.time())
+            audio_path = Path(f"audio_{timestamp}.wav")
 
-                    audio_path.write_bytes(audio_bytes)
-
-                    # Transcribe using Whisper
-                    with st.spinner():
-                        result = transcribe_audio(str(audio_path))
-                        user_input = result.get("text", "").strip()
-
-                    if not user_input or len(user_input) < 2:
-                        st.warning("Could not transcribe audio — please try again.")
-                        st.stop()
-
-                    # Store chat history
-                    if "interviewer_messages" not in st.session_state:
-                        st.session_state.interviewer_messages = []
-
-                    st.session_state.interviewer_messages.append({"role": "User", "content": user_input})
-                    with st.chat_message("User"):
-                        st.markdown(user_input)
-
-                    # Bot response
-                    with st.chat_message("Bot"):
-                        with st.spinner("Thinking..."):
-                            response = chat_with_interviewer(user_input, entire_data)
-                            st.markdown(response)
-
-                    st.session_state.interviewer_messages.append({"role": "Bot", "content": response})
-                except Exception as e:
-                    st.error(f"Error processing audio: {e}")
+            try:
+                audio_bytes = audio_value.read()
+                if len(audio_bytes) == 0:
+                    st.warning("Empty audio recording — please try again.")
                     st.stop()
 
-                finally:
-                    if audio_path.exists():
-                        try:
-                            audio_path.unlink()
-                        except Exception:
-                            pass  # Safe fail
+                audio_path.write_bytes(audio_bytes)
 
-            if prompt := st.chat_input("Type your reply here...", key="mock_interview_input"):
-                st.session_state.interviewer_messages.append({"role": "User", "content": prompt})
+                # Transcribe
+                with st.spinner("🧠 Transcribing audio..."):
+                    result = transcribe_audio(str(audio_path))
+                    user_input = result.get("text", "").strip()
+
+                if not user_input or len(user_input) < 2:
+                    st.warning("Could not transcribe audio — please try again.")
+                    st.stop()
+
+                # Show user's transcribed message
+                st.session_state.interviewer_messages.append({"role": "User", "content": user_input})
                 with st.chat_message("User"):
-                    st.markdown(prompt)
+                    st.markdown(user_input)
+
+                # Get interviewer response
                 with st.chat_message("Bot"):
                     with st.spinner("Thinking..."):
-                        response = chat_with_interviewer(prompt, entire_data) # This now includes saving
-                    st.session_state.interviewer_messages.append({"role": "Bot", "content": response})
+                        response = chat_with_interviewer(user_input, entire_data)
+                    st.markdown(response)
+
+                st.session_state.interviewer_messages.append({"role": "Bot", "content": response})
+
+            except Exception as e:
+                st.error(f"Error processing audio: {e}")
+            finally:
+                if audio_path.exists():
+                    try:
+                        audio_path.unlink()
+                    except Exception:
+                        pass
+
+        # Step 6: Handle text input
+        if prompt := st.chat_input("Type your reply here...", key="mock_interview_input"):
+            st.session_state.interviewer_messages.append({"role": "User", "content": prompt})
+            with st.chat_message("User"):
+                st.markdown(prompt)
+            with st.chat_message("Bot"):
+                with st.spinner("Thinking..."):
+                    response = chat_with_interviewer(prompt, entire_data)
+                st.markdown(response)
+            st.session_state.interviewer_messages.append({"role": "Bot", "content": response})
+
 
     # --- Tab 4: My Chats ---
     with tab4:
