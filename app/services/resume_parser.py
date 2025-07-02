@@ -1,6 +1,7 @@
 # services/resume_parser.py
 
 import io
+import os
 import re
 import docx2txt
 import pdfplumber
@@ -156,27 +157,27 @@ def extract_text_from_resume(content: bytes, filename: str) -> Optional[str]:
         file_ext = Path(filename).suffix.lower()
 
         if file_ext == ".pdf":
-                with tempfile.NamedTemporaryFile(delete=False, suffix=".pdf") as tmp:
-                    tmp.write(content)
-                    tmp_path = tmp.name
+            with tempfile.NamedTemporaryFile(delete=False, suffix=".pdf") as tmp:
+                tmp.write(content)
+                tmp_path = tmp.name
 
-                elements = partition_pdf(filename=tmp_path, languages=["eng"])
+            elements = partition_pdf(filename=tmp_path, languages=["eng"])
+            os.remove(tmp_path)  # Clean up temporary file
 
-                text = ""
-                for element in elements:
-                    text += element.text + "\n"
-            
-            # with pdfplumber.open(io.BytesIO(content)) as pdf:
-            #     text = "\n".join(
-            #         page.extract_text() or "" for page in pdf.pages
-            #     )
-                if not text.strip():
-                    logger.warning("PDF text extraction failed, trying alternative method")
+            text = ""
+            for element in elements:
+                text += element.text + "\n"
+
+            # Fallback using pdfplumber if partitioned text is empty
+            if not text.strip():
+                logger.warning("PDF text extraction failed, trying pdfplumber fallback")
+                with pdfplumber.open(io.BytesIO(content)) as pdf:
                     text = "\n".join(
-                        str(page.chars) if hasattr(page, 'chars') else "" 
+                        str(page.chars) if hasattr(page, 'chars') else ""
                         for page in pdf.pages
                     )
-                return text
+
+            return text
 
         elif file_ext == ".docx":
             return docx2txt.process(io.BytesIO(content))
@@ -184,11 +185,18 @@ def extract_text_from_resume(content: bytes, filename: str) -> Optional[str]:
         elif file_ext in (".txt", ".rtf"):
             return content.decode('utf-8', errors='ignore')
         
-        elif file_ext in(".jpg", "jpeg"):
-            elements = partition_image(filename)
+        elif file_ext in (".jpg", ".jpeg"):
+            with tempfile.NamedTemporaryFile(delete=False, suffix=file_ext) as tmp:
+                tmp.write(content)
+                tmp_path = tmp.name
+
+            elements = partition_image(filename=tmp_path)
+            os.remove(tmp_path)
+
             text = ""
             for element in elements:
                 text += element.text
+
             return text
 
         else:

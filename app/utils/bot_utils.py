@@ -231,8 +231,8 @@ def initialize_interview_qna_chain():
 
             prompt_template_str = """You are an AI mentor preparing a candidate for job interviews.
 
-Use the following retrieved context to answer the question:
-{context}
+Use the retrieved information and the chat history to respond appropriately.
+
 
 **Your primary instruction is as follows:**
 
