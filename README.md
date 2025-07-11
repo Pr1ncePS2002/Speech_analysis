@@ -8,9 +8,7 @@ This project implements a real-time fluency analysis application for speech. It 
 - [Project Overview](#project-overview)
 - [Key Features](#key-features)
 - [Technology Stack](#technology-stack)
-- [File Summaries](#file-summaries)
 - [Installation and Setup](#installation-and-setup)
-- [Usage](#usage)
 - [Contributing](#contributing)
 - [License](#license)
 
