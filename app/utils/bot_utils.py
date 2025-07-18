@@ -233,6 +233,8 @@ def initialize_interview_qna_chain():
 
 Use the retrieved information and the chat history to respond appropriately.
 
+Context:
+{context}
 
 **Your primary instruction is as follows:**
 
