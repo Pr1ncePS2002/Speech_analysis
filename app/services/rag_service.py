@@ -11,6 +11,7 @@ from tempfile import NamedTemporaryFile
 import unicodedata
 import logging
 from .resume_parser import parse_entire_resume  # Import the function
+import re
 
 # 🔹 NEW: Sentence tokenizer
 from nltk.tokenize import sent_tokenize
